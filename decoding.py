@@ -5,7 +5,6 @@ from qiskit.opflow import I, X, Y, Z, StateFn
 import numpy as np
 from qiskit.tools.monitor import job_monitor
 from qiskit.providers.aer.noise import NoiseModel, depolarizing_error
-from qiskit.test.mock import FakeJakarta
 from scipy.linalg import eig, LinAlgError
 
 from decoding_utils import *
@@ -13,17 +12,14 @@ from decoding_utils import *
 statevector = Aer.get_backend('statevector_simulator')
 qasm = Aer.get_backend('qasm_simulator')
 
-''' Params '''
-
+# Parameters
 num_qubits = 5
-
 random_statevector = random_statevector(2,0)
-
 shots = 16384 # this needs to be high for the encoded circuit expectations to have sufficiently low error to reproduce exact in noise free case
 
 # TODO: for ease doing this when the observable is a single pauli term, need to to extend to sum of pauli strings, will be same form as the code space Hamiltonian conjugation 
 target_observable = Z # the logical z
-logical_target_observable = Z^Z^Z^Z^Z # TODO: need to do this algorithmically
+logical_target_observable = Z^Z^Z^Z^Z # TODO: need to do this algorithmically for an arbitrary target observable.
 
 generators = [X^Z^Z^X^I, I^X^Z^Z^X, X^I^X^Z^Z, Z^X^I^X^Z]
 
@@ -33,6 +29,7 @@ code_space_hamiltonian = -1*sum(generators)
 transformed_hamiltonian_operators = [[[-1 * ((~m_i) @ g @ m_j) for g in generators] for m_j in generators] for m_i in generators] # defer the summing of the conjugated code space Hamiltonian until later
 corrected_observable_operators = [[(~m_i) @ logical_target_observable @ m_j for m_j in generators] for m_i in generators]
 
+
 # Calculate exact expectation for comparison.
 exact_expectation = np.abs(StateFn(target_observable).adjoint().eval(StateFn(random_statevector)))
 
@@ -40,31 +37,6 @@ depolarising_probabilities = [i / 100 for i in range(0,51,5)]
 unencoded_expectations = []
 uncorrected_encoded_expectations = []
 corrected_encoded_expectations = []
-
-'''
-    Initial check to see if check operators act as expected on state in code space. 
-'''
-'''
-initial_logical_qc = encode_5_qubit(random_statevector.data)
-initial_logical_sv = execute(initial_logical_qc, statevector, shots=shots).result().get_statevector() # for fidelity checks
-
-test1 = encode_5_qubit([1,0]) # logical 0 state
-test1_sv = execute(test1, statevector, shots=shots).result().get_statevector()
-
-print('test id')
-
-print(state_fidelity(initial_logical_sv, test1_sv))
-
-for g in generators:
-    print('test {}'.format(g))
-    test2 = encode_5_qubit(random_statevector.data) # logical state
-    test2.compose(g.to_circuit().decompose(), inplace=True)
-    test2_sv = execute(test2, statevector, shots=shots).result().get_statevector()
-
-    print(state_fidelity(initial_logical_sv, test2_sv))
-quit()
-'''
-
 
 for p in depolarising_probabilities:
     # Use parameterised noise model for ease of control
@@ -75,10 +47,7 @@ for p in depolarising_probabilities:
 
     backend = AerSimulator(noise_model=noise_model)
     
-    '''
-        Unencoded circuit with noise
-
-    '''
+    # Unencoded circuit with noise
     qr = QuantumRegister(1)
     unencoded_qc = QuantumCircuit(qr)
     unencoded_qc.initialize(random_statevector.data, 0)
@@ -86,9 +55,7 @@ for p in depolarising_probabilities:
     unencoded_target_observable_counts = execute(unencoded_qc, backend, shots=shots).result().get_counts()
     unencoded_expectations.append(np.abs((unencoded_target_observable_counts.get('0', 0) - unencoded_target_observable_counts.get('1', 0)) / shots))
     
-    '''
-        Encoded circuit with noise and no correct operations
-    '''
+    # Encoded circuit with noise and no correct operations
     encoded_uncorr_qc = encode_5_qubit(random_statevector.data)   
     encoded_uncorr_qc = hadamard_test(num_qubits, encoded_uncorr_qc, logical_target_observable.to_circuit())
     encoded_uncorr_target_observable_counts = execute(encoded_uncorr_qc, backend, shots=shots).result().get_counts()
@@ -98,9 +65,9 @@ for p in depolarising_probabilities:
     transformed_hamiltonian = np.zeros((num_generators, num_generators))
     corrected_observable_expectations = np.zeros((num_generators, num_generators))
     
-    # estimate required expectation values using quantum computer
+    # Estimate required expectation values using quantum computer
     for i in range(num_generators):
-       for j in range(num_generators): # TODO NEED REDUNDANT OPERATIONS TO INTRODUCE CONTROLLABLE LEVEL OF NOISE 
+       for j in range(num_generators): 
             corrected_observable_qc = encode_5_qubit(random_statevector.data)
             corrected_observable_qc = hadamard_test(num_qubits, corrected_observable_qc, corrected_observable_operators[i][j].to_circuit())
             corrected_observable_counts = execute(corrected_observable_qc, backend, shots=shots).result().get_counts()
@@ -118,14 +85,14 @@ for p in depolarising_probabilities:
                 transformed_ham_counts = execute(hadamard_test(num_qubits, transformed_ham_exp_qc, pauli_term.to_circuit()), backend, shots=shots).result().get_counts()
                 transformed_hamiltonian[i][j] += np.abs((transformed_ham_counts.get('0', 0) - transformed_ham_counts.get('1', 0)) / shots)
      
-    # solve classical eigenvalue problem
+    # Solve classical eigenvalue problem
     try:
         evals, evecs = eig(transformed_hamiltonian, overlap, right=True)
     except LinAlgError:
         print('scipy.eig eigenvalue computation did not converge.')
         quit()
 
-    # with the optimal coefficients for the subspace expansion (observe with and without diff operators) show you can correct some observable e.g. fidelity. 
+    # With the optimal coefficients for the subspace expansion (observe with and without diff operators) show you can correct some observable e.g. fidelity. 
     min_eval_index = [i for i in range(len(evals)) if evals[i] == min(evals)][0]
     min_evec = [row[min_eval_index] for row in evecs]
 
@@ -136,9 +103,7 @@ for p in depolarising_probabilities:
 
     corrected_encoded_expectations.append(corrected_observable)
 
-'''
-    Visualisation of results
-'''
+# Visualisation of results
 
 import matplotlib.pyplot as plt
 

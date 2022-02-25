@@ -1,6 +1,9 @@
 from qiskit import QuantumRegister, QuantumCircuit, ClassicalRegister
 
-def encode_5_qubit(input_state):
+'''
+    from N. David Mermin, “Lecture Notes on Quantum Computation,” Chapter 5, Cornell University, Physics 481-681, CS 483; Spring, 2006
+'''
+def encode_5_qubit_mermin(input_state):
     qr = QuantumRegister(5)
     qc = QuantumCircuit(qr)
 
@@ -35,7 +38,7 @@ def encode_5_qubit(input_state):
 '''
     Network for encoding 5 qubit code, from fig 4.2 Gottesmann PhD thesis. 
 '''
-def Aencode_5_qubit(input_state):
+def encode_5_qubit(input_state):
     qr = QuantumRegister(5)
     qc = QuantumCircuit(qr)
 
